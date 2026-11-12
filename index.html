@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Azan Clock</title>
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#0f172a">
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      font-family: system-ui, Arial, sans-serif;
+      background: #0f172a; color: #e2e8f0;
+      margin: 0 auto; padding: 16px; max-width: 480px;
+    }
+    h1 { text-align: center; font-size: 1.5rem; margin: 8px 0; }
+    .status {
+      text-align: center; padding: 12px;
+      background: #1e293b; border-radius: 12px;
+      margin-bottom: 16px; word-break: break-word;
+      transition: background .2s;
+    }
+    .status.connected { background: #064e3b; }
+    .status.error     { background: #7f1d1d; }
+    button {
+      width: 100%; padding: 14px; margin: 6px 0;
+      border: none; border-radius: 12px;
+      font-size: 1.05rem; font-weight: 600;
+      cursor: pointer; transition: opacity .15s;
+    }
+    button:disabled { opacity: .45; cursor: not-allowed; }
+    button:active:not(:disabled) { opacity: .8; }
+    .btn-primary   { background: #10b981; color: white; }
+    .btn-secondary { background: #f59e0b; color: white; }
+    .btn-gray      { background: #64748b; color: white; }
+    .btn-connect   { background: #3b82f6; color: white; }
+    .btn-disconnect{ background: #ef4444; color: white; }
+    .row { display: flex; gap: 8px; }
+    .row button { flex: 1; }
+    input {
+      width: 100%; padding: 12px; margin: 6px 0;
+      border-radius: 10px; border: none;
+      background: #1e293b; color: white; font-size: 1rem;
+    }
+    input.invalid { outline: 2px solid #ef4444; }
+    .section {
+      background: #1e293b; padding: 14px;
+      border-radius: 12px; margin: 14px 0;
+    }
+    .section h3 { margin: 0 0 10px 0; font-size: 1.1rem; }
+    .slider-container {
+      background: #1e293b; padding: 12px;
+      border-radius: 12px; margin: 10px 0;
+    }
+    label { display: block; margin-bottom: 4px; font-size: 0.9rem; }
+    label.check { display: flex; align-items: center; gap: 8px; margin: 8px 0; }
+    label.check input { width: auto; margin: 0; }
+    #wifiList { max-height: 140px; overflow-y: auto; margin: 8px 0; }
+    #wifiList button {
+      padding: 8px; font-size: 0.95rem;
+      font-weight: 500; margin: 4px 0;
+    }
+    .hint { font-size: 0.8rem; color: #94a3b8; margin: -2px 0 6px; }
+  </style>
+</head>
+<body>
+  <h1>Azan Clock</h1>
+  <div class="status" id="status">Не подключено</div>
+
+  <button class="btn-connect"    id="btnConnect">Подключиться</button>
+  <button class="btn-disconnect" id="btnDisconnect" style="display:none">Отключиться</button>
+
+  <button class="btn-primary" id="btnAzan" disabled>Запустить Азан</button>
+  <div class="row">
+    <button class="btn-secondary" id="btnLedOn"  disabled>Лента ВКЛ</button>
+    <button class="btn-gray"      id="btnLedOff" disabled>Лента ВЫКЛ</button>
+  </div>
+
+  <div class="slider-container">
+    <label>Громкость: <span id="volValue">15</span></label>
+    <input type="range" id="volume" min="0" max="30" value="15">
+    <button class="btn-primary" id="btnVol" disabled>Установить громкость</button>
+  </div>
+
+  <input type="number" id="track" placeholder="Номер трека (1–20)" value="1" min="1" max="20">
+  <div class="hint">От 1 до 20</div>
+  <button class="btn-primary" id="btnTrack"  disabled>Сменить трек</button>
+  <button class="btn-gray"    id="btnStatus" disabled>Статус</button>
+
+  <div class="section">
+    <h3>Будильник</h3>
+    <div class="row">
+      <input type="number" id="aHour" placeholder="Час"    min="0" max="23" value="7">
+      <input type="number" id="aMin"  placeholder="Минуты" min="0" max="59" value="0">
+    </div>
+    <input type="number" id="aTrack" placeholder="Трек (1–20)" min="1" max="20" value="1">
+    <label class="check"><input type="checkbox" id="aEnabled"> Включить будильник</label>
+    <button class="btn-primary" id="btnAlarm" disabled>Сохранить будильник</button>
+  </div>
+
+  <div class="section">
+    <h3>Установить время вручную</h3>
+    <input type="datetime-local" id="manualTime">
+    <button class="btn-gray" id="btnSetTime" disabled>Установить время</button>
+  </div>
+
+  <div class="section">
+    <h3>Wi-Fi</h3>
+    <button class="btn-gray" id="btnScan" disabled>Найти сети</button>
+    <div id="wifiList"></div>
+    <input type="text"     id="ssid" placeholder="SSID">
+    <input type="password" id="pass" placeholder="Пароль">
+    <button class="btn-primary" id="btnWifi" disabled>Подключить</button>
+  </div>
+
+  <div class="section">
+    <h3>Местоположение</h3>
+    <input type="number" step="any" id="lat" placeholder="Широта  (например 55.75)">
+    <input type="number" step="any" id="lon" placeholder="Долгота (например 37.62)">
+    <button class="btn-primary" id="btnLoc" disabled>Сохранить</button>
+  </div>
+
+  <div class="section">
+    <h3>Тихие часы (отключение азана)</h3>
+    <input type="number" id="qStart" placeholder="С (час)"  min="0" max="23" value="22">
+    <input type="number" id="qEnd"   placeholder="До (час)" min="0" max="23" value="6">
+    <label class="check"><input type="checkbox" id="qEnabled" checked> Включить тихие часы</label>
+    <button class="btn-primary" id="btnQuiet" disabled>Сохранить</button>
+  </div>
+
+  <script>
+    const SERVICE_UUID = "4fafc201-1fb5-459e-8fcc-c5c9c331914b";
+    const CHAR_UUID    = "beb5483e-36e1-4688-b7f5-ea07361b26a8";
+    const DEVICE_NAME  = "AzanClock-BLE";
+
+    let device = null, characteristic = null, connected = false;
+    const $ = id => document.getElementById(id);
+    const statusEl = $("status");
+
+    const gatedIds = [
+      "btnAzan","btnLedOn","btnLedOff","btnVol","btnTrack","btnStatus",
+      "btnAlarm","btnSetTime","btnScan","btnWifi","btnLoc","btnQuiet"
+    ];
+    const gated = gatedIds.map(id => $(id));
+
+    function setStatus(text, cls = "") {
+      statusEl.textContent = text;
+      statusEl.className = "status" + (cls ? " " + cls : "");
+    }
+    function setConnectedUI(isOn) {
+      connected = isOn;
+      $("btnConnect").style.display = isOn ? "none" : "block";
+      $("btnDisconnect").style.display = isOn ? "block" : "none";
+      gated.forEach(b => b.disabled = !isOn);
+    }
+    function markInvalid(el, bad) {
+      el.classList.toggle("invalid", bad);
+    }
+
+    async function send(cmd) {
+      if (!characteristic || !connected) {
+        setStatus("Сначала подключитесь", "error");
+        return false;
+      }
+      try {
+        await characteristic.writeValue(new TextEncoder().encode(cmd));
+        setStatus("Отправлено: " + cmd);
+        return true;
+      } catch (err) {
+        setStatus("Ошибка отправки: " + err.message, "error");
+        if (!device?.gatt?.connected) setConnectedUI(false);
+        return false;
+      }
+    }
+
+    $("btnConnect").onclick = async () => {
+      try {
+        device = await navigator.bluetooth.requestDevice({
+          filters: [{ name: DEVICE_NAME }],
+          optionalServices: [SERVICE_UUID]
+        });
+        device.addEventListener("gattserverdisconnected", onDisconnected);
+
+        setStatus("Подключение…");
+        const server = await device.gatt.connect();
+        const service = await server.getPrimaryService(SERVICE_UUID);
+        characteristic = await service.getCharacteristic(CHAR_UUID);
+
+        await characteristic.startNotifications();
+        characteristic.addEventListener("characteristicvaluechanged", onNotify);
+
+        setConnectedUI(true);
+        setStatus("Подключено", "connected");
+      } catch (err) {
+        setStatus("Ошибка подключения: " + err.message, "error");
+        setConnectedUI(false);
+      }
+    };
+
+    function onDisconnected() {
+      characteristic = null;
+      setConnectedUI(false);
+      setStatus("Устройство отключено", "error");
+    }
+
+    $("btnDisconnect").onclick = () => {
+      if (device?.gatt?.connected) device.gatt.disconnect();
+      else onDisconnected();
+    };
+
+    function onNotify(e) {
+      const value = new TextDecoder().decode(e.target.value);
+
+      if (value.startsWith("WIFILIST:")) {
+        renderWifiList(value.substring(9));
+        setStatus("Найдено сетей: " +
+          value.substring(9).split("|").filter(Boolean).length, "connected");
+        return;
+      }
+      setStatus("Устройство: " + value, "connected");
+    }
+
+    function renderWifiList(raw) {
+      const container = $("wifiList");
+      container.innerHTML = "";
+      const list = raw.split("|").map(s => s.trim()).filter(Boolean);
+      if (!list.length) {
+        container.textContent = "Сети не найдены";
+        return;
+      }
+      list.forEach(ssid => {
+        const btn = document.createElement("button");
+        btn.className = "btn-gray";
+        btn.textContent = ssid;
+        btn.onclick = () => { $("ssid").value = ssid; $("pass").focus(); };
+        container.appendChild(btn);
+      });
+    }
+
+    $("volume").oninput = e => { $("volValue").textContent = e.target.value; };
+
+    function num(id, min, max) {
+      const el = $(id);
+      const v = Number(el.value);
+      const ok = el.value !== "" && Number.isFinite(v) && v >= min && v <= max;
+      markInvalid(el, !ok);
+      return ok ? v : null;
+    }
+
+    $("btnAzan").onclick   = () => send("AZAN");
+    $("btnLedOn").onclick  = () => send("LEDON");
+    $("btnLedOff").onclick = () => send("LEDOFF");
+    $("btnStatus").onclick = () => send("STATUS");
+
+    $("btnVol").onclick = () => {
+      const v = num("volume", 0, 30);
+      if (v === null) return setStatus("Громкость: 0–30", "error");
+      send("VOL:" + v);
+    };
+
+    $("btnTrack").onclick = () => {
+      const t = num("track", 1, 20);
+      if (t === null) return setStatus("Трек: 1–20", "error");
+      send("TRACK:" + t);
+    };
+
+    $("btnAlarm").onclick = () => {
+      const h  = num("aHour", 0, 23);
+      const m  = num("aMin",  0, 59);
+      const tr = num("aTrack", 1, 20);
+      if (h === null || m === null || tr === null)
+        return setStatus("Будильник: часы 0–23, минуты 0–59, трек 1–20", "error");
+      const en = $("aEnabled").checked ? 1 : 0;
+      send(`ALARM:${h};${m};${en};${tr}`);
+    };
+
+    $("btnSetTime").onclick = () => {
+      const dt = $("manualTime").value;
+      if (!dt) return setStatus("Выберите дату и время", "error");
+      const d = new Date(dt);
+      if (isNaN(d)) return setStatus("Некорректная дата", "error");
+      send(`SETTIME:${d.getFullYear()};${d.getMonth()+1};${d.getDate()};` +
+           `${d.getHours()};${d.getMinutes()};0`);
+    };
+
+    $("btnScan").onclick = () => {
+      $("wifiList").textContent = "Сканирование…";
+      send("SCANWIFI");
+    };
+
+    $("btnWifi").onclick = () => {
+      const ssid = $("ssid").value.trim();
+      const pass = $("pass").value;
+      markInvalid($("ssid"), !ssid);
+      if (!ssid) return setStatus("Введите SSID", "error");
+      if (ssid.includes(";") || pass.includes(";"))
+        return setStatus("SSID/пароль не должны содержать ';'", "error");
+      send(`WIFI:${ssid};${pass}`);
+    };
+
+    $("btnLoc").onclick = () => {
+      const lat = parseFloat($("lat").value);
+      const lon = parseFloat($("lon").value);
+      const latOK = Number.isFinite(lat) && lat >= -90  && lat <= 90;
+      const lonOK = Number.isFinite(lon) && lon >= -180 && lon <= 180;
+      markInvalid($("lat"), !latOK);
+      markInvalid($("lon"), !lonOK);
+      if (!latOK || !lonOK)
+        return setStatus("Координаты: широта −90…90, долгота −180…180", "error");
+      send(`LOC:${lat};${lon}`);
+    };
+
+    $("btnQuiet").onclick = () => {
+      const s = num("qStart", 0, 23);
+      const e = num("qEnd",   0, 23);
+      if (s === null || e === null)
+        return setStatus("Тихие часы: 0–23", "error");
+      const en = $("qEnabled").checked ? 1 : 0;
+      send(`QUIET:${s};${e};${en}`);
+    };
+
+    if (!navigator.bluetooth) {
+      setStatus("Web Bluetooth не поддерживается. Нужен Chrome/Edge " +
+                "по HTTPS или с localhost.", "error");
+      $("btnConnect").disabled = true;
+    }
+    setConnectedUI(false);
+
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('sw.js');
+    }
+  </script>
+</body>
+</html>
