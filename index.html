@@ -9,10 +9,9 @@
     <style>
         body { font-family: system-ui; background: #0f172a; color: #e2e8f0; padding: 16px; max-width: 480px; margin: auto; }
         h1 { text-align: center; }
-        .status { background: #1e293b; padding: 12px; border-radius: 12px; text-align: center; margin-bottom: 16px; font-weight: 600; transition: background .2s, color .2s; }
-        button { width: 100%; padding: 14px; margin: 6px 0; border: none; border-radius: 12px; font-size: 1.05rem; font-weight: 600; cursor: pointer; transition: opacity .15s; }
-        button:disabled { opacity: 0.4; cursor: not-allowed; }
-        button:active:not(:disabled) { opacity: 0.8; }
+        .status { background: #1e293b; padding: 12px; border-radius: 12px; text-align: center; margin-bottom: 16px; font-weight: 600; }
+        button { width: 100%; padding: 14px; margin: 6px 0; border: none; border-radius: 12px; font-size: 1.05rem; font-weight: 600; cursor: pointer; }
+        button:disabled { opacity: 0.5; cursor: not-allowed; }
         .btn-primary { background: #10b981; color: white; }
         .btn-secondary { background: #f59e0b; color: white; }
         .btn-gray { background: #64748b; color: white; }
@@ -20,11 +19,10 @@
         .btn-connect { background: #3b82f6; color: white; }
         .row { display: flex; gap: 8px; }
         .row button { flex: 1; }
-        input, select { width: 100%; padding: 12px; margin: 6px 0; border-radius: 10px; border: none; background: #1e293b; color: white; font-size: 1rem; }
+        input { width: 100%; padding: 12px; margin: 6px 0; border-radius: 10px; border: none; background: #1e293b; color: white; }
         .section { background: #1e293b; padding: 14px; border-radius: 12px; margin: 14px 0; }
-        label { display: block; margin: 6px 0; font-size: 0.9rem; opacity: 0.8; }
+        label { display: block; margin: 6px 0; }
         .log { background: #000; color: #0f0; padding: 8px; border-radius: 8px; font-family: monospace; height: 120px; overflow-y: auto; font-size: 0.8rem; margin-top: 10px; }
-        .btn-track { font-size: 1.2rem; padding: 10px; display: flex; justify-content: center; align-items: center; }
     </style>
 </head>
 <body>
@@ -38,81 +36,29 @@
 <button class="btn-primary" id="btnConnect" onclick="connectBLE()">🔗 Подключиться (выбрать устройство)</button>
 <button class="btn-gray" id="btnDisconnect" onclick="disconnectBLE()" disabled>Отключиться</button>
 
-<!-- УПРАВЛЕНИЕ MP3 -->
 <div class="section">
-    <h3>🎵 Управление MP3</h3>
-    
-    <!-- Основные кнопки плеера -->
+    <h3>Управление MP3</h3>
     <button class="btn-primary cmd-btn" onclick="sendCmd('AZAN')" disabled>▶ Запустить Азан</button>
-    
-    <div class="row" style="margin: 10px 0;">
-        <button class="btn-secondary btn-track cmd-btn" onclick="sendCmd('PREV')" disabled>⏮ Пред.</button>
-        <button class="btn-secondary btn-track cmd-btn" onclick="sendCmd('NEXT')" disabled>След. ⏭</button>
-    </div>
-    
     <div class="row">
         <button class="btn-secondary cmd-btn" onclick="sendCmd('PAUSE')" disabled>⏸ Пауза</button>
         <button class="btn-secondary cmd-btn" onclick="sendCmd('RESUME')" disabled>⏵ Продолжить</button>
     </div>
     <button class="btn-danger cmd-btn" onclick="sendCmd('STOP')" disabled>⏹ СТОП</button>
-    
-    <!-- Ввод конкретного трека -->
-    <div style="margin-top: 15px; border-top: 1px solid #334155; padding-top: 10px;">
-        <label>Включить конкретный трек:</label>
-        <input type="number" id="trackInput" min="1" max="20" value="1" placeholder="Номер трека">
-        <button class="btn-primary cmd-btn" onclick="playTrack()" disabled>Включить трек</button>
-    </div>
-
-    <!-- Громкость -->
-    <div style="margin-top: 15px; border-top: 1px solid #334155; padding-top: 10px;">
-        <label>Громкость: <span id="volVal">20</span></label>
-        <input type="range" id="volRange" min="0" max="30" value="20" oninput="document.getElementById('volVal').innerText=this.value">
-        <button class="btn-primary cmd-btn" onclick="sendCmd('VOL:' + document.getElementById('volRange').value)" disabled>Установить громкость</button>
-    </div>
 </div>
 
-<!-- РЕЛЕ -->
 <div class="section">
-    <h3>💡 Реле</h3>
+    <h3>Управление реле</h3>
     <div class="row">
-        <button class="btn-secondary cmd-btn" onclick="sendCmd('LEDON')" disabled>ВКЛ</button>
-        <button class="btn-gray cmd-btn" onclick="sendCmd('LEDOFF')" disabled>ВЫКЛ</button>
+        <button class="btn-secondary cmd-btn" onclick="sendCmd('LEDON')" disabled>💡 ВКЛ</button>
+        <button class="btn-gray cmd-btn" onclick="sendCmd('LEDOFF')" disabled>🌑 ВЫКЛ</button>
     </div>
 </div>
 
-<!-- БУДИЛЬНИК -->
 <div class="section">
-    <h3>⏰ Будильник</h3>
-    <div class="row">
-        <input type="number" id="ah" min="0" max="23" value="7" placeholder="Час">
-        <input type="number" id="am" min="0" max="59" value="0" placeholder="Мин">
-    </div>
-    <input type="number" id="atrack" min="1" max="20" value="1" placeholder="Трек для будильника">
-    <label><input type="checkbox" id="aen"> Включить будильник</label>
-    <button class="btn-primary cmd-btn" onclick="saveAlarm()" disabled>Сохранить будильник</button>
-</div>
-
-<!-- КООРДИНАТЫ -->
-<div class="section">
-    <h3>📍 Координаты и метод</h3>
-    <label>Широта (Latitude)</label>
-    <input type="number" step="any" id="lat" value="55.7558">
-    <label>Долгота (Longitude)</label>
-    <input type="number" step="any" id="lon" value="37.6173">
-    <label>Метод расчета (14 = Россия)</label>
-    <input type="number" id="method" value="14">
-    <button class="btn-primary cmd-btn" onclick="saveLoc()" disabled>Сохранить координаты</button>
-</div>
-
-<!-- ТИХИЕ ЧАСЫ -->
-<div class="section">
-    <h3>🌙 Тихие часы</h3>
-    <div class="row">
-        <input type="number" id="qs" min="0" max="23" value="22" placeholder="Начало (час)">
-        <input type="number" id="qe" min="0" max="23" value="6" placeholder="Конец (час)">
-    </div>
-    <label><input type="checkbox" id="qen"> Включить тихие часы</label>
-    <button class="btn-primary cmd-btn" onclick="saveQuiet()" disabled>Сохранить тихие часы</button>
+    <h3>Громкость</h3>
+    <label>Текущая: <span id="volVal">20</span></label>
+    <input type="range" id="volRange" min="0" max="30" value="20" oninput="document.getElementById('volVal').innerText=this.value">
+    <button class="btn-primary cmd-btn" onclick="sendCmd('VOL:' + document.getElementById('volRange').value)" disabled>Установить громкость</button>
 </div>
 
 <div class="section">
@@ -128,12 +74,14 @@
     let bluetoothDevice = null;
     let bluetoothCharacteristic = null;
 
+    // Элементы UI
     const statusEl = document.getElementById('connStatus');
     const btnConnect = document.getElementById('btnConnect');
     const btnAutoConnect = document.getElementById('btnAutoConnect');
     const btnDisconnect = document.getElementById('btnDisconnect');
     const cmdBtns = document.querySelectorAll('.cmd-btn');
 
+    // Функция лога
     function log(msg) {
         const logBox = document.getElementById('logBox');
         logBox.innerHTML += msg + '<br>';
@@ -141,6 +89,7 @@
         console.log(msg);
     }
 
+    // Обновление интерфейса при подключении/отключении
     function updateUI(connected, deviceName = '') {
         if (connected) {
             statusEl.innerText = "✅ Подключено к " + (deviceName || "устройству");
@@ -151,13 +100,14 @@
             cmdBtns.forEach(b => b.disabled = false);
         } else {
             statusEl.innerText = "❌ Не подключено";
-            statusEl.style.color = "#ef4444";
+            statusEl.style.color = "red";
             btnConnect.style.display = "block";
             btnDisconnect.disabled = true;
             cmdBtns.forEach(b => b.disabled = true);
         }
     }
 
+    // 1. ОБЫЧНОЕ ПОДКЛЮЧЕНИЕ (с выбором устройства)
     async function connectBLE() {
         try {
             log("Запрос устройства...");
@@ -180,6 +130,7 @@
         }
     }
 
+    // 2. АВТОМАТИЧЕСКОЕ ПОДКЛЮЧЕНИЕ (без выбора, если разрешение уже было)
     async function autoConnect() {
         try {
             log("Поиск ранее подключенных устройств...");
@@ -190,6 +141,7 @@
                 return;
             }
 
+            // Ищем наши часы по имени или берем первое попавшееся
             const device = devices.find(d => d.name === DEVICE_NAME) || devices[0];
             log("Найдено устройство: " + device.name);
 
@@ -207,15 +159,21 @@
         }
     }
 
+    // Вспомогательная функция для GATT
     async function doGattConnect(device) {
         const server = await device.gatt.connect();
+        log("GATT подключен");
+
         const service = await server.getPrimaryService(SERVICE_UUID);
+        log("Сервис найден");
+
         bluetoothCharacteristic = await service.getCharacteristic(CHAR_UUID);
-        
+        log("Характеристика найдена");
+
         await bluetoothCharacteristic.startNotifications();
         bluetoothCharacteristic.addEventListener('characteristicvaluechanged', handleNotifications);
-        
-        log("Успешно подключено!");
+        log("Уведомления включены");
+
         updateUI(true, device.name);
     }
 
@@ -223,18 +181,21 @@
         log("Устройство отключено");
         bluetoothCharacteristic = null;
         updateUI(false);
-        checkSavedDevices();
+        checkSavedDevices(); // Проверяем, можно ли предложить автоподключение
     }
 
-    function disconnectBLE() {
+    async function disconnectBLE() {
         if (bluetoothDevice && bluetoothDevice.gatt.connected) {
             bluetoothDevice.gatt.disconnect();
+            log("Отключение...");
         }
     }
 
     function handleNotifications(event) {
-        const text = new TextDecoder('utf-8').decode(event.target.value);
-        log("📥 Ответ: " + text);
+        const value = event.target.value;
+        const decoder = new TextDecoder('utf-8');
+        const text = decoder.decode(value);
+        log("📥 Ответ от часов: " + text);
     }
 
     async function sendCmd(cmd) {
@@ -243,55 +204,22 @@
             return;
         }
         try {
-            const data = new TextEncoder().encode(cmd);
+            const encoder = new TextEncoder();
+            const data = encoder.encode(cmd);
             await bluetoothCharacteristic.writeValue(data);
             log("📤 Отправлено: " + cmd);
         } catch (error) {
             log("Ошибка отправки: " + error);
-            if (!bluetoothDevice?.gatt?.connected) updateUI(false);
         }
     }
 
-    function playTrack() {
-        const trackNum = document.getElementById('trackInput').value;
-        if (!trackNum || trackNum < 1 || trackNum > 20) {
-            log("Ошибка: номер трека от 1 до 20");
-            return;
-        }
-        sendCmd('TRACK:' + trackNum);
-    }
-
-    function saveAlarm() {
-        const h = document.getElementById('ah').value;
-        const m = document.getElementById('am').value;
-        const en = document.getElementById('aen').checked ? 1 : 0;
-        const track = document.getElementById('atrack').value;
-        sendCmd('ALARM:' + h + ';' + m + ';' + en + ';' + track);
-    }
-
-    function saveLoc() {
-        const lat = document.getElementById('lat').value;
-        const lon = document.getElementById('lon').value;
-        const method = document.getElementById('method').value;
-        sendCmd('LOC:' + lat + ';' + lon);
-        sendCmd('METHOD:' + method);
-    }
-
-    function saveQuiet() {
-        const qs = document.getElementById('qs').value;
-        const qe = document.getElementById('qe').value;
-        const en = document.getElementById('qen').checked ? 1 : 0;
-        sendCmd('QUIET:' + qs + ';' + qe + ';' + en);
-    }
-
+    // Проверка наличия сохраненных устройств для показа кнопки автоподключения
     async function checkSavedDevices() {
         if (navigator.bluetooth && navigator.bluetooth.getDevices) {
             try {
                 const devices = await navigator.bluetooth.getDevices();
                 if (devices.length > 0) {
-                    btnAutoConnect.style.display = "block";
-                } else {
-                    btnAutoConnect.style.display = "none";
+                    btnAutoConnect.style.display = "block"; // Показываем кнопку быстрого подключения
                 }
             } catch (e) {
                 console.log("Не удалось получить список устройств", e);
@@ -299,6 +227,7 @@
         }
     }
 
+    // Инициализация при загрузке страницы
     window.onload = () => {
         updateUI(false);
         checkSavedDevices();
