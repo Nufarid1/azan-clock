@@ -25,6 +25,9 @@
         label { display: block; margin: 6px 0; font-size: 0.9rem; opacity: 0.8; }
         .log { background: #000; color: #0f0; padding: 8px; border-radius: 8px; font-family: monospace; height: 120px; overflow-y: auto; font-size: 0.8rem; margin-top: 10px; }
         .btn-track { font-size: 1.2rem; padding: 10px; display: flex; justify-content: center; align-items: center; }
+        .prayer-list { background: #0f172a; border-radius: 10px; padding: 10px; margin-top: 10px; font-family: monospace; }
+        .prayer-item { display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid #1e293b; }
+        .prayer-item:last-child { border-bottom: none; }
     </style>
 </head>
 <body>
@@ -38,11 +41,23 @@
 <button class="btn-primary" id="btnConnect" onclick="connectBLE()">🔗 Подключиться (выбрать устройство)</button>
 <button class="btn-gray" id="btnDisconnect" onclick="disconnectBLE()" disabled>Отключиться</button>
 
+<!-- ВРЕМЕНА НАМАЗА -->
+<div class="section">
+    <h3>🕌 Времена намаза на сегодня</h3>
+    <div class="prayer-list" id="prayerList">
+        <div class="prayer-item"><span>Фаджр</span><span id="p-fajr">--:--</span></div>
+        <div class="prayer-item"><span>Зухр</span><span id="p-dhuhr">--:--</span></div>
+        <div class="prayer-item"><span>Аср</span><span id="p-asr">--:--</span></div>
+        <div class="prayer-item"><span>Магриб</span><span id="p-maghrib">--:--</span></div>
+        <div class="prayer-item"><span>Иша</span><span id="p-isha">--:--</span></div>
+    </div>
+    <button class="btn-primary cmd-btn" onclick="sendCmd('GETPRAYERS')" disabled>🔄 Обновить с часов</button>
+</div>
+
 <!-- УПРАВЛЕНИЕ MP3 -->
 <div class="section">
     <h3>🎵 Управление MP3</h3>
     
-    <!-- Основные кнопки плеера -->
     <button class="btn-primary cmd-btn" onclick="sendCmd('AZAN')" disabled>▶ Запустить Азан</button>
     
     <div class="row" style="margin: 10px 0;">
@@ -56,14 +71,12 @@
     </div>
     <button class="btn-danger cmd-btn" onclick="sendCmd('STOP')" disabled>⏹ СТОП</button>
     
-    <!-- Ввод конкретного трека -->
     <div style="margin-top: 15px; border-top: 1px solid #334155; padding-top: 10px;">
         <label>Включить конкретный трек:</label>
         <input type="number" id="trackInput" min="1" max="20" value="1" placeholder="Номер трека">
         <button class="btn-primary cmd-btn" onclick="playTrack()" disabled>Включить трек</button>
     </div>
 
-    <!-- Громкость -->
     <div style="margin-top: 15px; border-top: 1px solid #334155; padding-top: 10px;">
         <label>Громкость: <span id="volVal">20</span></label>
         <input type="range" id="volRange" min="0" max="30" value="20" oninput="document.getElementById('volVal').innerText=this.value">
@@ -77,6 +90,24 @@
     <div class="row">
         <button class="btn-secondary cmd-btn" onclick="sendCmd('LEDON')" disabled>ВКЛ</button>
         <button class="btn-gray cmd-btn" onclick="sendCmd('LEDOFF')" disabled>ВЫКЛ</button>
+    </div>
+</div>
+
+<!-- WIFI -->
+<div class="section">
+    <h3>📶 WiFi</h3>
+    <button class="btn-secondary cmd-btn" onclick="scanWifi()" disabled>🔍 Найти сети</button>
+    
+    <div id="wifiList" style="display:none; margin-top: 10px;">
+        <label>Выберите сеть:</label>
+        <select id="wifiSSID">
+            <option value="">-- Выберите --</option>
+        </select>
+        
+        <label style="margin-top:10px;">Пароль:</label>
+        <input type="password" id="wifiPass" placeholder="Пароль от WiFi">
+        
+        <button class="btn-primary cmd-btn" onclick="connectWifi()" disabled>🔗 Подключиться</button>
     </div>
 </div>
 
@@ -217,6 +248,12 @@
         
         log("Успешно подключено!");
         updateUI(true, device.name);
+        
+        // Автоматически запрашиваем времена намаза после подключения
+        setTimeout(() => {
+            sendCmd('GETPRAYERS');
+            checkPrayerSync();
+        }, 1000);
     }
 
     function onDisconnected() {
@@ -235,6 +272,59 @@
     function handleNotifications(event) {
         const text = new TextDecoder('utf-8').decode(event.target.value);
         log("📥 Ответ: " + text);
+        
+        // Обработка списка сетей
+        if (text.startsWith("NETWORKS:")) {
+            const list = text.substring(9);
+            const select = document.getElementById('wifiSSID');
+            select.innerHTML = '<option value="">-- Выберите --</option>';
+            
+            if (list.length > 0) {
+                const networks = list.split(';').filter(n => n.length > 0);
+                networks.forEach(net => {
+                    const [ssid, rssi] = net.split(',');
+                    const opt = document.createElement('option');
+                    opt.value = ssid;
+                    opt.textContent = ssid + ' (' + rssi + ' dBm)';
+                    select.appendChild(opt);
+                });
+            } else {
+                log("Сети не найдены");
+            }
+            document.getElementById('wifiList').style.display = 'block';
+        }
+        
+        // Обработка результата подключения WiFi
+        if (text.startsWith("WIFI OK:")) {
+            log("✅ WiFi подключен! IP: " + text.substring(8));
+        } else if (text === "WIFI FAIL") {
+            log("❌ Не удалось подключиться к WiFi. Проверьте пароль.");
+        }
+        
+        // Обработка времени намаза
+        if (text.startsWith("PRAYERS:")) {
+            const times = text.substring(8).split(';');
+            if (times.length === 5) {
+                document.getElementById('p-fajr').innerText = times[0];
+                document.getElementById('p-dhuhr').innerText = times[1];
+                document.getElementById('p-asr').innerText = times[2];
+                document.getElementById('p-maghrib').innerText = times[3];
+                document.getElementById('p-isha').innerText = times[4];
+                log("✅ Времена намаза обновлены");
+            }
+        }
+        
+        // Обработка дня намаза
+        if (text.startsWith("PRAYERDAY:")) {
+            const savedDay = parseInt(text.substring(10));
+            const today = new Date().getDate();
+            if (savedDay !== today) {
+                log("⚠️ Расписание устарело. Загружаю на неделю...");
+                downloadWeekPrayer();
+            } else {
+                log("✅ Расписание на сегодня актуально.");
+            }
+        }
     }
 
     async function sendCmd(cmd) {
@@ -284,6 +374,70 @@
         sendCmd('QUIET:' + qs + ';' + qe + ';' + en);
     }
 
+    // === WiFi ===
+    function scanWifi() {
+        if (!bluetoothCharacteristic) return;
+        log("🔍 Запрос сканирования WiFi...");
+        sendCmd('SCAN');
+        document.getElementById('wifiList').style.display = 'none';
+    }
+
+    function connectWifi() {
+        const ssid = document.getElementById('wifiSSID').value;
+        const pass = document.getElementById('wifiPass').value;
+        if (!ssid) { log("Выберите сеть"); return; }
+        log("📤 Подключение к " + ssid);
+        sendCmd('WIFI:' + ssid + ';' + pass);
+    }
+
+    // === Автосинхронизация намаза на неделю ===
+    async function checkPrayerSync() {
+        await sendCmd('GETPRAYERDAY');
+    }
+
+    async function downloadWeekPrayer() {
+        const lat = document.getElementById('lat').value || 55.7558;
+        const lon = document.getElementById('lon').value || 37.6173;
+        const method = document.getElementById('method').value || 14;
+        
+        const today = new Date();
+        let weekData = "";
+        
+        log("⏳ Загрузка расписания на 7 дней...");
+        
+        for (let i = 0; i < 7; i++) {
+            const d = new Date(today);
+            d.setDate(today.getDate() + i);
+            const day = String(d.getDate()).padStart(2, '0');
+            const month = String(d.getMonth() + 1).padStart(2, '0');
+            const year = d.getFullYear();
+            const dateStr = `${day}-${month}-${year}`;
+            
+            try {
+                const url = `https://api.aladhan.com/v1/timings/${dateStr}?latitude=${lat}&longitude=${lon}&method=${method}`;
+                const response = await fetch(url);
+                const data = await response.json();
+                
+                if (data.code === 200) {
+                    const t = data.data.timings;
+                    weekData += `${d.getDate()};${t.Fajr};${t.Dhuhr};${t.Asr};${t.Maghrib};${t.Isha}`;
+                    if (i < 6) weekData += "|";
+                    log(`  ${d.getDate()}.${month}: ${t.Fajr}, ${t.Dhuhr}, ${t.Asr}, ${t.Maghrib}, ${t.Isha}`);
+                } else {
+                    log(`  Ошибка API для ${dateStr}`);
+                    return;
+                }
+            } catch (e) {
+                log(`  Ошибка сети для ${dateStr}: ${e.message}`);
+                return;
+            }
+        }
+        
+        log("📤 Отправка расписания на часы...");
+        await sendCmd("WEEK:" + weekData);
+        log("✅ Расписание на неделю отправлено!");
+    }
+
     async function checkSavedDevices() {
         if (navigator.bluetooth && navigator.bluetooth.getDevices) {
             try {
@@ -313,3 +467,4 @@
 
 </body>
 </html>
+
